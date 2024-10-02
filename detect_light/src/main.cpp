@@ -39,7 +39,7 @@ void setup() {
 //    delay(delayForSwithPos);
        // change delay to millis
       long start=millis();
-      while (start+delayForSwithPos>=millis(){
+      while (start+delayForSwithPos>=millis()){
       }
 
     digitalWrite(serviceLed,HIGH);
@@ -84,14 +84,34 @@ for (size_t i = 0; i < 4; i++)
 
 
 void loop() {
-  int left = analogRead(leftPin);
-  int right = analogRead(rightPin);
+  float left = analogRead(leftPin);
+  float right = analogRead(rightPin);
+
+  float left_p = right/(values[0] - values[1])*100;
+  float right_p = right/(values[2] - values[3])*100;
 
   Serial.print("left ");
   Serial.print(left);
-  Serial.print(" right ");
+  Serial.print("% right ");
   Serial.print(right);
-  Serial.println("");
-  delay(800);
+  Serial.println("%");
 
+  if (left_p - right_p > 3.0)
+  {
+    digitalWrite(rightLed,LOW);
+    digitalWrite(leftLed,HIGH);
+  }
+  else if (left_p - right_p < -3.0)
+  {
+    digitalWrite(leftLed,LOW);
+    digitalWrite(rightLed,HIGH);
+  }
+  else
+  {
+    digitalWrite(leftLed,HIGH);
+    digitalWrite(rightLed,HIGH);
+  }
+
+
+  delay(3000);
 }
