@@ -20,7 +20,7 @@ while True:
     if photo_val_resp:
         photo_val = int.from_bytes(photo_val_resp,"big")
         print(photo_val)
-        if photo_val > 50:
+        if photo_val > 10:
             resp = send_command('u', responses['u'], connection_led)
             print("up")
         else:
