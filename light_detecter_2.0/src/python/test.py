@@ -16,7 +16,6 @@ def send_command(cmd: str, response_len: int, connection: serial.Serial) -> str:
     return resp
 
 while True:
-    photo_val_resp: str = send_command('p', responses['p'], connection_photo)
-    if photo_val_resp:
-        photo_val =photo_val_resp
-        print(photo_val)
+    photo_val_resp: bytes = send_command('p', responses['p'], connection_photo)
+
+    print(photo_val_resp.decode())

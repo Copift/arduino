@@ -8,7 +8,7 @@ import requests
 broker="broker.emqx.io"
 pub_id=""
 
-response = requests.get('http://10.8.0.1:5000/get_id')
+response = requests.get('http://copift.ru:5000/get_id')
 if response.status_code == 200:
     data = response.json()
     pub_id = data['pub_id']
@@ -32,9 +32,9 @@ client.on_message=on_message
 
 print("Connecting to broker",broker)
 client.connect(broker)
+client.subscribe(f"lab/{pub_id}/photo/average")
 client.loop_start()
 print("Subcribing")
-client.subscribe(f"lab/{pub_id}/led/state")
 time.sleep(1800)
 client.disconnect()
 client.loop_stop()
