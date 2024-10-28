@@ -35,13 +35,15 @@ client = mqtt_client.Client(
 
 print("Connecting to broker",broker)
 print(pub_id)
+client.connect(broker)
 client.loop_start()
 print("Publishing")
 import time
 stream_active=False
 time.sleep(5)
 values = []
-# Обработчик сообщений для управления потоком
+
+client.subscribe(f"lab/{pub_id}/photo/activate_stream")
 def on_message(client, userdata, msg):
     global stream_active
     if msg.topic == f"lab/{pub_id}/photo/activate_stream":
@@ -51,7 +53,6 @@ def on_message(client, userdata, msg):
         elif command == "off":
             stream_active = False
 
-client.subscribe(f"lab/{pub_id}/photo/activate_stream")
 
 def send_command(cmd, connection: serial.Serial):
     connection.write(cmd)
