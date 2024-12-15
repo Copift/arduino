@@ -3,8 +3,8 @@
 //
 
 // Настройки WiFi
-#define wifi_ssid     "Ета мой вайфай"
-#define wifi_pass     "123lena123"
+#define wifi_ssid     "LIGHT"
+#define wifi_pass     "island08"
 
 // Сервер MQTT
 #define mqtt_server   "35.172.255.228"

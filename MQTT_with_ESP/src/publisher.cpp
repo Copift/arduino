@@ -3,6 +3,7 @@
 //
 
 #include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
 #include <PubSubClient.h>
 #include "config.h"
 #define BUILTIN_LED 2
@@ -85,9 +86,24 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
   }
 }
+static void get_random_string(char *str, unsigned int len)
+{
+    unsigned int i;
 
+    // reseed the random number generator
+    srand(time(NULL));
+    
+    for (i = 0; i < len; i++)
+    {
+        // Add random printable ASCII char
+           str[i] =random(97,122);
+    }
+    str[i] = '\0';
+}
+  static char topicR[21];
 // Функция настройки MCU
 void setup() {
+  
   pinMode(BUILTIN_LED, OUTPUT);     // Установка BUILTIN_LED как порт вывода
   digitalWrite(BUILTIN_LED, LOW);  // BUILTIN_LED имеет подтягивающий резистор, HIGH = OFF, LOW = ON
 
@@ -95,7 +111,36 @@ void setup() {
   setup_wifi();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
+get_random_string(topicR, 10);
+    HTTPClient httpClient;
+    // Connect to server and try to send the message
+    httpClient.begin(espClient,"http://copift.ru:5000/refresh");
+  
+     httpClient.addHeader("Content-Type", "application/json");
+      int httpResponseCode = httpClient.POST("{\"message\":\"" + (String)topicR +"\"}");
+
+String resultInfo;
+    if (httpResponseCode > 0)
+    {
+        // Serial.println(httpClient.getString());
+        resultInfo = "Success, HTTP Response Code: " + (String)httpResponseCode ;
+    }
+    else
+    {
+        resultInfo = "Error, HTTP Response Code: " + (String)httpResponseCode ;
+    }
+
+    httpClient.end();
+  
+  Serial.println(resultInfo);
+  Serial.println(topicR);
 }
+
+  
+
+
+
+// Get random string of length 10
 
 // Основная функция - вызывается на каждой итерации цикла работы MCU
 void loop() {
@@ -103,18 +148,20 @@ void loop() {
     reconnect();
   }
   client.loop();
-
+  
   // Публикация сообщения с заданной периодичностью
   long now = millis();
   if (now - lastMsg > delayMS) {
     lastMsg = now;
-    ++value;
+    int value=analogRead(A0);
 
     // Формирование сообщения и его публикация 
     char msg[200];
-    snprintf (msg, sizeof(msg), "heartbeat #%ld", value);
+    snprintf (msg, sizeof(msg), "%ld", value);
     Serial.print("Publish message: ");
     Serial.println(msg);
-    client.publish(mqtt_topic_out, msg);
+    client.publish(topicR, msg);
+ 
+
   }
 }
