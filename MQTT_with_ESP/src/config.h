@@ -15,4 +15,4 @@
 // MQTT топики
 #define mqtt_topic_status  "esp8266COPIFT/15/status"
 #define mqtt_topic_out     "esp8266COPIFT/15/heartbeat"
-#define mqtt_topic_in      "esp8266COPIFT/15/led"
+#define mqtt_topic_in      "mvthjflrgk"

@@ -11,7 +11,7 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 String clientId = String(ESP.getChipId());
 
-int  delayMS = 10000;  // Задаержка в мс между публикацией сообщений
+int  delayMS = 1000;  // Задаержка в мс между публикацией сообщений
 long lastMsg = 0;      // Время публикации предыдущего сообщения  (мс) 
 int  value = 0;        // Переменная для формирования публикуемого сообщения
 void setup_wifi() {
@@ -54,7 +54,7 @@ void reconnect() {
       client.publish(mqtt_topic_status, clientId.c_str());
 
       // Подписка на сообщения в топике, заданном значением mqtt_topic_in
-      client.subscribe(mqtt_topic_in);
+     // client.subscribe(mqtt_topic_in);
       // Если нужно подписаться на несколько топиков, то для каждого из них вызываем client.subscribe()
     } else {
       Serial.print(F("failed, rc="));
@@ -103,7 +103,7 @@ static void get_random_string(char *str, unsigned int len)
   static char topicR[21];
 // Функция настройки MCU
 void setup() {
-  
+  pinMode(A0, INPUT);
   pinMode(BUILTIN_LED, OUTPUT);     // Установка BUILTIN_LED как порт вывода
   digitalWrite(BUILTIN_LED, LOW);  // BUILTIN_LED имеет подтягивающий резистор, HIGH = OFF, LOW = ON
 
@@ -154,6 +154,8 @@ void loop() {
   if (now - lastMsg > delayMS) {
     lastMsg = now;
     int value=analogRead(A0);
+    Serial.println(value);
+
 
     // Формирование сообщения и его публикация 
     char msg[200];
