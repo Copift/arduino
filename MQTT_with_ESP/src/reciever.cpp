@@ -9,7 +9,6 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 String clientId = String(ESP.getChipId());
 
-int  delayMS = 30000;  // Задаержка в мс между публикацией сообщений
 long lastMsg = 0;      // Время публикации предыдущего сообщения  (мс)
 int  value = 0;        // Переменная для формирования публикуемого сообщения
 
@@ -30,11 +29,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println(res);
   Serial.println();
   Serial.println();
-  // Если получено сообщение и у нас подписка на несколько топиков, то определяем в каком топике сообщение опубликовано
- 
-    // Определяем поведение MCU при различных значениях сообщения (payload)
-    if (res < 800) {
-      digitalWrite(2, HIGH); // BUILTIN_LED имеет подтягивающий резистор, HIGH = OFF, LOW = ON
+  
+    if (res < 100) {
+      digitalWrite(2, HIGH); 
     }
     else {
       digitalWrite(2, LOW);
@@ -43,9 +40,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 
-//
-// functions.ino
-//
 
 // Функция установления соединения по WiFi
 void setup_wifi() {
@@ -99,19 +93,18 @@ void reconnect(char* mqtt_topic) {
 char mqtt_topic[1024];
 // Функция настройки MCU
 void setup() {
-  pinMode(2, OUTPUT);     // Установка BUILTIN_LED как порт вывода
-  digitalWrite(2, HIGH);  // BUILTIN_LED имеет подтягивающий резистор, HIGH = OFF, LOW = ON
+  pinMode(2, OUTPUT);    
+  digitalWrite(2, HIGH);  
 
   Serial.begin(9600);
   setup_wifi();
   
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
-  // Your Domain name with URL path or IP address with path
+  //получение топика с сервера
        HTTPClient httpClient;
   httpClient.begin(espClient,"http://copift.ru:5000/get_id");
-// If your need Node-RED/server authentication, insert user and password below
-//http.setAuthorization("REPLACE_WITH_SERVER_USERNAME", "REPLACE_WITH_SERVER_PASSWORD");
+
 
 // Send HTTP GET request
 int httpResponseCode = httpClient.GET();
@@ -124,10 +117,10 @@ int httpResponseCode = httpClient.GET();
   payload=payload.substring(a,b);
   
 strcpy(mqtt_topic, payload.c_str());
- 
+   digitalWrite(2, HIGH);  
+  9
 }
 
-// Основная функция - вызывается на каждой итерации цикла работы MCU
 void loop() {
   if (!client.connected()) {
     reconnect(mqtt_topic);

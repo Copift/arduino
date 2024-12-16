@@ -14,6 +14,7 @@ String clientId = String(ESP.getChipId());
 int  delayMS = 1000;  // Задаержка в мс между публикацией сообщений
 long lastMsg = 0;      // Время публикации предыдущего сообщения  (мс) 
 int  value = 0;        // Переменная для формирования публикуемого сообщения
+//настройка wifi
 void setup_wifi() {
   delay(10);
   Serial.println();
@@ -50,12 +51,10 @@ void reconnect() {
     if (client.connect(clientId.c_str(), mqtt_login, mqtt_pass)) {  
       Serial.println(F("connected"));
 
-      // Публикация сообщения с идентификаторм клиента в топик, заданный значением 'mqtt_topic_status'
+     
       client.publish(mqtt_topic_status, clientId.c_str());
 
-      // Подписка на сообщения в топике, заданном значением mqtt_topic_in
-     // client.subscribe(mqtt_topic_in);
-      // Если нужно подписаться на несколько топиков, то для каждого из них вызываем client.subscribe()
+     
     } else {
       Serial.print(F("failed, rc="));
       Serial.print(client.state());
@@ -64,9 +63,8 @@ void reconnect() {
     }
   }
 }
-// Функция обработки входящих сообщений
 void callback(char* topic, byte* payload, unsigned int length) {
-  // Печать информации о полученном сообщенийй
+ 
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
@@ -74,44 +72,35 @@ void callback(char* topic, byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
   }
   Serial.println();
-
-  // Если получено сообщение и у нас подписка на несколько топиков, то определяем в каком топике сообщение опубликовано
-  if (strcmp(topic, mqtt_topic_in) == 0) { 
-    // Определяем поведение MCU при различных значениях сообщения (payload)
-    if ((char)payload[0] == '0') {
-      digitalWrite(BUILTIN_LED, HIGH); // BUILTIN_LED имеет подтягивающий резистор, HIGH = OFF, LOW = ON
-    }
-    if ((char)payload[0] == '1') {
-      digitalWrite(BUILTIN_LED, LOW);
-    }
-  }
 }
+//генерация рандомного topic
 static void get_random_string(char *str, unsigned int len)
 {
     unsigned int i;
 
-    // reseed the random number generator
+  
     srand(time(NULL));
     
     for (i = 0; i < len; i++)
     {
-        // Add random printable ASCII char
+       
            str[i] =random(97,122);
     }
     str[i] = '\0';
 }
   static char topicR[21];
-// Функция настройки MCU
+
 void setup() {
   pinMode(A0, INPUT);
-  pinMode(BUILTIN_LED, OUTPUT);     // Установка BUILTIN_LED как порт вывода
-  digitalWrite(BUILTIN_LED, LOW);  // BUILTIN_LED имеет подтягивающий резистор, HIGH = OFF, LOW = ON
+  pinMode(BUILTIN_LED, OUTPUT);     
+  digitalWrite(BUILTIN_LED, LOW);  
 
   Serial.begin(9600);
   setup_wifi();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
 get_random_string(topicR, 10);
+//отправка сгенерированного топика на сервер
     HTTPClient httpClient;
     // Connect to server and try to send the message
     httpClient.begin(espClient,"http://copift.ru:5000/refresh");
@@ -138,11 +127,6 @@ String resultInfo;
 
   
 
-
-
-// Get random string of length 10
-
-// Основная функция - вызывается на каждой итерации цикла работы MCU
 void loop() {
   if (!client.connected()) {
     reconnect();
