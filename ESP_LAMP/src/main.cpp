@@ -1,101 +1,237 @@
 #include <Arduino.h>
-#include <WiFi.h>
-#include <WebServer.h>
+#include "Config.h"
+#include "WIFI.h"
+#include "Server.h"
+#include "MQTT.h"
+#include "EEPROM.h"
+#include <ESP8266WebServer.h>
+#define LED_PIN 2  // Встроенный светодиод (D4)
+#define EEPROM_SIZE 96
+char savedSSID[32];
+char savedPassword[32];
+bool isConnected = false;
+String ssid = "ESP_Default"; // Название AP
+String password = "password123"; // Пароль AP
+ESP8266WebServer server(80);    
+void saveWiFiConfig(const char* ssid, const char* pass) {
+  EEPROM.begin(EEPROM_SIZE);
+  memset(savedSSID, 0, sizeof(savedSSID));
+  memset(savedPassword, 0, sizeof(savedPassword));
+  strncpy(savedSSID, ssid, sizeof(savedSSID) - 1);
+  strncpy(savedPassword, pass, sizeof(savedPassword) - 1);
+  for (int i = 0; i < 32; i++) {
+    EEPROM.write(i, savedSSID[i]);
+    EEPROM.write(32 + i, savedPassword[i]);
+  }
+  EEPROM.commit();
+    EEPROM.end();
+}
+// Загрузка данных из EEPROM
+void loadWiFiConfig() {
+  EEPROM.begin(EEPROM_SIZE);
+  for (int i = 0; i < 32; i++) {
+    savedSSID[i] = EEPROM.read(i);
+    savedPassword[i] = EEPROM.read(32 + i);
+  }
+  EEPROM.end();
+}
+void handleRoot() {
+  String html = R"=====(
+    <html>
+      <body>
+        <h2>Configure WiFi</h2>
+        <form action="/configure" method="POST">
+          SSID: <input type="text" name="ssid"><br>
+          Password: <input type="password" name="password"><br>
+          <input type="submit" value="Save and Connect">
+        </form>
+      </body>
+    </html>
+  )=====";
+  
+  server.send(200, "text/html", html);
+  Serial.println("get root html ");
+}
+void handleNotFound(){
+  server.send(404, "text/plain", "404: Not found"); 
+}
 
-/* Установите здесь свои SSID и пароль */
-const char* ssid = "ESP32_COPIFT";  
-const char* password = "01234567";  
-/* Настройки IP адреса */
-IPAddress local_ip(192,168,2,1);
-IPAddress gateway(192,168,2,1);
-IPAddress subnet(255,255,255,0);
-WebServer server(80);
-uint8_t LED1pin = 4;
-bool LED1status = LOW;
-uint8_t LED2pin = 5;
-bool LED2status = LOW;
-String SendHTML(uint8_t led1stat,uint8_t led2stat){
-  String ptr = "<!DOCTYPE html> <html>\n";
-  ptr +="<meta http-equiv=\"Content-type\" content=\"text/html; charset=utf-8\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
-  ptr +="<title>Управление светодиодом</title>\n";
-  ptr +="<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n";
-  ptr +="body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;} h3 {color: #444444;margin-bottom: 50px;}\n";
-  ptr +=".button {display: block;width: 80px;background-color: #3498db;border: none;color: white;padding: 13px 30px;text-decoration: none;font-size: 25px;margin: 0px auto 35px;cursor: pointer;border-radius: 4px;}\n";
-  ptr +=".button-on {background-color: #3498db;}\n";
-  ptr +=".button-on:active {background-color: #2980b9;}\n";
-  ptr +=".button-off {background-color: #34495e;}\n";
-  ptr +=".button-off:active {background-color: #2c3e50;}\n";
-  ptr +="p {font-size: 14px;color: #888;margin-bottom: 10px;}\n";
-  ptr +="</style>\n";
-  ptr +="</head>\n";
-  ptr +="<body>\n";
-  ptr +="<h1>ESP32 Веб сервер</h1>\n";
-    ptr +="<h3>Режим точка доступа WiFi (AP)</h3>\n";
-   if(led1stat)
-  {ptr +="<p>Состояние LED1: ВКЛ.</p><a class=\"button button-off\" href=\"/led1off\">ВЫКЛ.</a>\n";}
-  else
-  {ptr +="<p>Состояние LED1: ВЫКЛ.</p><a class=\"button button-on\" href=\"/led1on\">ВКЛ.</a>\n";}
-  if(led2stat)
-  {ptr +="<p>Состояние LED2: ВКЛ.</p><a class=\"button button-off\" href=\"/led2off\">ВЫКЛ.</a>\n";}
-  else
-  {ptr +="<p>Состояние LED2: ВЫКЛ.</p><a class=\"button button-on\" href=\"/led2on\">ВКЛ.</a>\n";}
-  ptr +="</body>\n";
-  ptr +="</html>\n";
-  return ptr;
+void blinkLED(int onTime, int offTime) {
+  digitalWrite(LED_PIN, HIGH);
+  delay(onTime);
+  digitalWrite(LED_PIN, LOW);
+  delay(offTime);
 }
-void handle_OnConnect() {
-  LED1status = LOW;
-  LED2status = LOW;
-  Serial.println("GPIO4 Status: OFF | GPIO5 Status: OFF");
-  server.send(200, "text/html", SendHTML(LED1status,LED2status)); 
+
+bool connectToWiFi() {
+  WiFi.begin(savedSSID, savedPassword);
+  Serial.print("Connecting to Wi-Fi: ");
+  Serial.println(savedSSID);
+  int delayT=600;
+  int attempts = 15;
+  while (WiFi.status() != WL_CONNECTED && attempts > 0) {
+    if (attempts%2==0){
+      delayT=300;
+    }else{
+      delayT=600;
+    }
+    digitalWrite(2,LOW);
+    attempts--;
+    delay(delayT);
+      digitalWrite(2,HIGH);
+    delay(delayT);
+    Serial.print("attempt: ");
+    Serial.println(attempts);
+  }
+
+  return WiFi.status() == WL_CONNECTED;
 }
-void handle_led1on() {
-  LED1status = HIGH;
-  Serial.println("GPIO4 Status: ON");
-  server.send(200, "text/html", SendHTML(true,LED2status)); 
+
+void twoBlinkDelay(){
+  long timeNow=millis();
+  digitalWrite(2,LOW);
+  for (size_t i = 0; i < 2; i++)
+  {
+     
+  while (millis()<timeNow+(long)500){
+
+  }
+  timeNow=millis();
+digitalWrite(2,HIGH);
+while (millis()<timeNow+(long)500){
+
+  }
+
 }
-void handle_led1off() {
-  LED1status = LOW;
-  Serial.println("GPIO4 Status: OFF");
-  server.send(200, "text/html", SendHTML(false,LED2status)); 
+timeNow=millis();
+while (millis()<timeNow+(long) 4000){
+
+  }
 }
-void handle_led2on() {
-  LED2status = HIGH;
-  Serial.println("GPIO5 Status: ON");
-  server.send(200, "text/html", SendHTML(LED1status,true)); 
+void boot();
+
+// Обработчик сохранения данных Wi-Fi
+void handleConfigure() {
+  if (server.hasArg("ssid") && server.hasArg("password")) {
+    String ssid = server.arg("ssid");
+    String password = server.arg("password");
+
+    saveWiFiConfig(ssid.c_str(), password.c_str());
+    server.send(200, "text/html", "Configuration saved. Restarting...");
+    delay(2000);
+    boot();
+  } else {
+    server.send(400, "text/html", "Missing SSID or Password");
+  }
 }
-void handle_led2off() {
-  LED2status = LOW;
-  Serial.println("GPIO5 Status: OFF");
-  server.send(200, "text/html", SendHTML(LED1status,false)); 
+
+
+
+void handleLED() {                          
+  digitalWrite(led, !digitalRead(led));
+  server.sendHeader("Location","/"); // redirection to keep button on the screen
+  server.send(303);
 }
-void handle_NotFound(){
-  server.send(404, "text/plain", "Not found");
+
+void handleSENSOR() {                          
+  int data = analogRead(A0);
+  //server.sendHeader("Location","/");
+  server.send(200, "text/html", String(data));
 }
-void setup() {
+
+
+void server_init() {
+  server.on("/", HTTP_GET, handleRoot);     
+  server.on("/LED", HTTP_POST, handleLED);  
+  server.on("/SENSOR", HTTP_GET, handleSENSOR);  
+  server.on("/configure", HTTP_POST, handleConfigure);
+  server.onNotFound(handleNotFound);        
+
+  server.begin();                          
+  Serial.println("HTTP server started");    
+}
+ void boot(){
+    loadWiFiConfig();
+  Serial.println("Start boot");
+  if (strlen(savedSSID) > 0 && strlen(savedPassword) > 0) {
+      Serial.println("load settings complete. wifi settings  ");
+      Serial.print(savedSSID);
+      Serial.print(" passwd: ");
+            Serial.println(savedPassword);
+    isConnected = connectToWiFi();
+  }
+  if (isConnected) {
+    Serial.println("Connected to Wi-Fi");
+    Serial.println(WiFi.localIP());
+    WiFi.softAPdisconnect (true);
+   MQTT_init();
+  } else {
+    // Поднятие точки доступа
+    Serial.println("Starting Access Point");
+    StartAPMode(ssid,password);
+    Serial.println(WiFi.softAPIP());
+  }
+ server_init();
+ }
+void setup(void){
   Serial.begin(9600);
-  pinMode(LED1pin, OUTPUT);
-  pinMode(LED2pin, OUTPUT);
-  WiFi.softAP(ssid, password);
-  WiFi.softAPConfig(local_ip, gateway, subnet);
-  delay(100);
-  server.on("/", handle_OnConnect);
-  server.on("/led1on", handle_led1on);
-  server.on("/led1off", handle_led1off);
-  server.on("/led2on", handle_led2on);
-  server.on("/led2off", handle_led2off);
-  server.onNotFound(handle_NotFound);
-  server.begin();
-  Serial.println("HTTP server started");
+  pinMode(5, OUTPUT);
+   pinMode(led, OUTPUT);
+  //WIFI_init(true);
+  boot();
+ 
+  //mqtt_cli.publish("esp8266/state", "hello emqx");
 }
-void loop() {
-  server.handleClient();
-  if(LED1status)
-  {digitalWrite(LED1pin, HIGH);}
-  else
-  {digitalWrite(LED1pin, LOW);}
-  if(LED2status)
-  {digitalWrite(LED2pin, HIGH);}
-  else
-  {digitalWrite(LED2pin, LOW);}
+long lastMillis=millis();
+int ledState=LOW;
+int c=3;
+int count=1;
+void loop(void){
+  server.handleClient();    
+  
+client.loop();
+
+if (isConnected){
+    if (WiFi.status() != WL_CONNECTED){
+      Serial.println("wifi disconnected, reboot... ");
+  boot();
+}            
+    // Управляем светодиодом
+    if (millis() - lastMillis >=(long) 500*c) {
+      lastMillis = millis();
+
+      if (ledState == LOW) {
+        ledState = HIGH;
+      } else {
+        ledState = LOW;
+      }
+      if (ledState==HIGH){
+      count+=1;
+      }
+      digitalWrite(2, ledState);
+        if (count==2){
+        c=4;
+        count=0;
+      }else{
+        c=1;
+      }
+
+    }
+}else{
+
+    // Управляем светодиодом
+    if (millis() - lastMillis >= 1000) {
+      lastMillis = millis();
+      if (ledState == LOW) {
+        ledState = HIGH;
+      } else {
+        ledState = LOW;
+      }
+      digitalWrite(2, ledState);
+    }
+
+
+}
+
+
 }
