@@ -6,14 +6,15 @@
 #include "EEPROM.h"
 #include <ESP8266WebServer.h>
 #define LED_PIN 2  // Встроенный светодиод (D4)
-#define EEPROM_SIZE 96
-char savedSSID[32];
-char savedPassword[32];
-bool isConnected = false;
+#define EEPROM_SIZE 96//ппамять под сохранение
+
+char savedSSID[32];//сохранение название вай фай
+char savedPassword[32];//сохранение пароля
+bool isConnected = false;//переменная подключения к wifi
 String ssid = "ESP_Default"; // Название AP
 String password = "password123"; // Пароль AP
-ESP8266WebServer server(80);    
-void saveWiFiConfig(const char* ssid, const char* pass) {
+ESP8266WebServer server(80);
+void saveWiFiConfig(const char* ssid, const char* pass) { //функция сохранения в память данных о вай фай
   EEPROM.begin(EEPROM_SIZE);
   memset(savedSSID, 0, sizeof(savedSSID));
   memset(savedPassword, 0, sizeof(savedPassword));
@@ -26,6 +27,7 @@ void saveWiFiConfig(const char* ssid, const char* pass) {
   EEPROM.commit();
     EEPROM.end();
 }
+
 // Загрузка данных из EEPROM
 void loadWiFiConfig() {
   EEPROM.begin(EEPROM_SIZE);
@@ -35,6 +37,8 @@ void loadWiFiConfig() {
   }
   EEPROM.end();
 }
+
+//выдача основной странички с вводом данных
 void handleRoot() {
   String html = R"=====(
     <html>
@@ -48,29 +52,25 @@ void handleRoot() {
       </body>
     </html>
   )=====";
-  
+
   server.send(200, "text/html", html);
   Serial.println("get root html ");
 }
+
+// 404 ошибка
 void handleNotFound(){
-  server.send(404, "text/plain", "404: Not found"); 
+  server.send(404, "text/plain", "404: Not found");
 }
 
-void blinkLED(int onTime, int offTime) {
-  digitalWrite(LED_PIN, HIGH);
-  delay(onTime);
-  digitalWrite(LED_PIN, LOW);
-  delay(offTime);
-}
-
+//подключение к вай фай
 bool connectToWiFi() {
   WiFi.begin(savedSSID, savedPassword);
   Serial.print("Connecting to Wi-Fi: ");
   Serial.println(savedSSID);
-  int delayT=600;
-  int attempts = 15;
+  int delayT=600//задержка между попытками подключения
+  int attempts = 15;// количество попыток
   while (WiFi.status() != WL_CONNECTED && attempts > 0) {
-    if (attempts%2==0){
+    if (attempts%2==0){//моргание при подключении
       delayT=300;
     }else{
       delayT=600;
@@ -78,7 +78,7 @@ bool connectToWiFi() {
     digitalWrite(2,LOW);
     attempts--;
     delay(delayT);
-      digitalWrite(2,HIGH);
+    digitalWrite(2,HIGH);
     delay(delayT);
     Serial.print("attempt: ");
     Serial.println(attempts);
@@ -87,151 +87,111 @@ bool connectToWiFi() {
   return WiFi.status() == WL_CONNECTED;
 }
 
-void twoBlinkDelay(){
-  long timeNow=millis();
-  digitalWrite(2,LOW);
-  for (size_t i = 0; i < 2; i++)
-  {
-     
-  while (millis()<timeNow+(long)500){
-
-  }
-  timeNow=millis();
-digitalWrite(2,HIGH);
-while (millis()<timeNow+(long)500){
-
-  }
-
-}
-timeNow=millis();
-while (millis()<timeNow+(long) 4000){
-
-  }
-}
+//функция загрузки и проверок подключения вызывается при изменении подключений
 void boot();
 
-// Обработчик сохранения данных Wi-Fi
+// Обработчик сохранения данных вай фай
 void handleConfigure() {
+
   if (server.hasArg("ssid") && server.hasArg("password")) {
     String ssid = server.arg("ssid");
     String password = server.arg("password");
-
-    saveWiFiConfig(ssid.c_str(), password.c_str());
+    saveWiFiConfig(ssid.c_str(), password.c_str());// вызываем сохранение
     server.send(200, "text/html", "Configuration saved. Restarting...");
     delay(2000);
-    boot();
+    boot();//вызываем перезагрузку
   } else {
     server.send(400, "text/html", "Missing SSID or Password");
   }
 }
 
-
-
-void handleLED() {                          
-  digitalWrite(led, !digitalRead(led));
-  server.sendHeader("Location","/"); // redirection to keep button on the screen
-  server.send(303);
-}
-
-void handleSENSOR() {                          
-  int data = analogRead(A0);
-  //server.sendHeader("Location","/");
-  server.send(200, "text/html", String(data));
-}
-
-
+//запуск веб сервера
 void server_init() {
-  server.on("/", HTTP_GET, handleRoot);     
-  server.on("/LED", HTTP_POST, handleLED);  
-  server.on("/SENSOR", HTTP_GET, handleSENSOR);  
+  server.on("/", HTTP_GET, handleRoot);
   server.on("/configure", HTTP_POST, handleConfigure);
-  server.onNotFound(handleNotFound);        
-
-  server.begin();                          
-  Serial.println("HTTP server started");    
+  server.onNotFound(handleNotFound);
+  server.begin();
+  Serial.println("HTTP server started");
 }
- void boot(){
-    loadWiFiConfig();
+
+//функция загрузки и проверок подключения вызывается при изменении подключений
+void boot(){
+  loadWiFiConfig();//загружаем из памяти настройки вай фай
   Serial.println("Start boot");
+
   if (strlen(savedSSID) > 0 && strlen(savedPassword) > 0) {
       Serial.println("load settings complete. wifi settings  ");
       Serial.print(savedSSID);
       Serial.print(" passwd: ");
-            Serial.println(savedPassword);
-    isConnected = connectToWiFi();
+      Serial.println(savedPassword);
+      isConnected = connectToWiFi();//подключаемся
   }
+
   if (isConnected) {
+    //подключаем mqtt  и отключаем  AP
     Serial.println("Connected to Wi-Fi");
     Serial.println(WiFi.localIP());
     WiFi.softAPdisconnect (true);
-   MQTT_init();
+    MQTT_init();
   } else {
     // Поднятие точки доступа
     Serial.println("Starting Access Point");
     StartAPMode(ssid,password);
     Serial.println(WiFi.softAPIP());
   }
- server_init();
+  server_init();
  }
 void setup(void){
   Serial.begin(9600);
   pinMode(5, OUTPUT);
-   pinMode(led, OUTPUT);
-  //WIFI_init(true);
+  pinMode(led, OUTPUT);
   boot();
- 
-  //mqtt_cli.publish("esp8266/state", "hello emqx");
 }
 long lastMillis=millis();
 int ledState=LOW;
-int c=3;
+int c=3;//множитель задержки для двойного мигания
 int count=1;
 void loop(void){
-  server.handleClient();    
-  
-client.loop();
-
-if (isConnected){
-    if (WiFi.status() != WL_CONNECTED){
-      Serial.println("wifi disconnected, reboot... ");
-  boot();
-}            
-    // Управляем светодиодом
-    if (millis() - lastMillis >=(long) 500*c) {
-      lastMillis = millis();
-
-      if (ledState == LOW) {
-        ledState = HIGH;
-      } else {
-        ledState = LOW;
+  server.handleClient();    //http сервер
+  client.loop();//mqtt
+  if (isConnected){
+      if (WiFi.status() != WL_CONNECTED){
+        Serial.println("wifi disconnected, reboot... ");
+        boot();
       }
-      if (ledState==HIGH){
-      count+=1;
-      }
-      digitalWrite(2, ledState);
+      // Управляем светодиодом
+      if (millis() - lastMillis >=(long) 500*c) {
+        lastMillis = millis();
+        if (ledState == LOW) {
+          ledState = HIGH;
+        } else {
+          ledState = LOW;
+        }
+        if (ledState==HIGH){
+        count+=1;
+        }
+        digitalWrite(2, ledState);
         if (count==2){
-        c=4;
-        count=0;
-      }else{
-        c=1;
+          c=4;
+          count=0;
+        }else{
+          c=1;
+        }
+      }
+  }else {// если не подклчючены к  wifi
+      // Управляем светодиодом
+      if (millis() - lastMillis >= 1000) {
+        lastMillis = millis();
+        if (ledState == LOW) {
+          ledState = HIGH;
+        } else {
+          ledState = LOW;
+        }
+        digitalWrite(2, ledState);
       }
 
-    }
-}else{
 
-    // Управляем светодиодом
-    if (millis() - lastMillis >= 1000) {
-      lastMillis = millis();
-      if (ledState == LOW) {
-        ledState = HIGH;
-      } else {
-        ledState = LOW;
-      }
-      digitalWrite(2, ledState);
-    }
-
-
-}
+  }
 
 
 }
